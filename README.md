@@ -2,7 +2,7 @@
 
 Intraday trading strategy framework for **US500**, **US100**, **Gold (XAU/USD)**, and major **FX** pairs.
 
-- **Data / backtesting / live bars:** [yfinance](https://github.com/ranaroussi/yfinance) (Yahoo Finance). Outbound requests are throttled to ≥ 200 ms apart and retried with exponential backoff.
+- **Data / backtesting / live bars:** [iTick](https://itick.org) REST API. Free-tier callers are capped at **5 requests per minute**, so outbound requests are spaced ≥ 12 seconds apart and retried with exponential backoff.
 - **Execution:** [Ostium](https://www.ostium.com/) decentralized perpetuals on Arbitrum (defaults to **Sepolia testnet**).
 
 The repo ships a pluggable `Strategy` interface plus four research-backed strategies, all driven by the same backtester and the same execution adapter.
@@ -18,18 +18,31 @@ The repo ships a pluggable `Strategy` interface plus four research-backed strate
 
 Reported single-asset Sharpe ratios in the original papers run from ~1.3 (SPY momentum bands) up to ~2.1 (VWAP). Treat first runs on Gold / FX as out-of-sample tests, not validated alpha — peer-reviewed evidence is concentrated on US equity indices.
 
-## Symbol map (yfinance ↔ Ostium)
+## Symbol map (iTick ↔ Ostium)
 
-| Internal | yfinance ticker | Ostium feed |
-|---|---|---|
-| US500 | `ES=F` (E-mini S&P 500 futures) | `SPX/USD` |
-| US100 | `NQ=F` (NASDAQ-100 futures) | `NDX/USD` |
-| GOLD  | `GC=F` (gold futures) | `XAU/USD` |
-| EURUSD | `EURUSD=X` | `EUR/USD` |
-| GBPUSD | `GBPUSD=X` | `GBP/USD` |
-| USDJPY | `USDJPY=X` | `USD/JPY` |
+| Internal | iTick endpoint | iTick `region` / `code` | Ostium feed |
+|---|---|---|---|
+| US500  | `/indices/kline` | `US` / `SPX`    | `SPX/USD` |
+| US100  | `/indices/kline` | `US` / `NDX`    | `NDX/USD` |
+| GOLD   | `/forex/kline`   | `GB` / `XAUUSD` | `XAU/USD` |
+| EURUSD | `/forex/kline`   | `GB` / `EURUSD` | `EUR/USD` |
+| GBPUSD | `/forex/kline`   | `GB` / `GBPUSD` | `GBP/USD` |
+| USDJPY | `/forex/kline`   | `GB` / `USDJPY` | `USD/JPY` |
 
-We use front-month futures for indices and gold because Yahoo's intraday data for cash indices (`^GSPC`, `^NDX`) is unreliable and rate-limited harder.
+If your iTick subscription uses a different region/code per instrument, edit `src/trading_bot/symbols.py` — that's the single source of truth for the mapping.
+
+## Interval mapping (`kType`)
+
+| CLI flag | iTick `kType` |
+|---|---|
+| `1m`  | 1 |
+| `5m`  | 2 |
+| `15m` | 3 |
+| `30m` | 4 |
+| `1h`  | 5 |
+| `1d`  | 8 |
+| `1w`  | 9 |
+| `1mo` | 10 |
 
 ## Quickstart
 
@@ -37,7 +50,7 @@ We use front-month futures for indices and gold because Yahoo's intraday data fo
 python -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env  # only needs Ostium keys; yfinance is keyless
+cp .env.example .env  # paste ITICK_TOKEN and Ostium keys
 
 # Run tests (offline, no network)
 pytest -q
@@ -54,24 +67,16 @@ python -m trading_bot.runner.live_cli \
     --strategy intraday_momentum_bands --bars 50
 ```
 
-## yfinance intervals & lookback caps
-
-Yahoo silently caps intraday history depending on interval:
-
-| Interval | Max history |
-|---|---|
-| `1m` | last 7 days |
-| `2m`, `5m`, `15m`, `30m`, `60m`, `90m` | last 60 days |
-| `1h` | last 730 days |
-| `1d`, `1wk`, `1mo` | unlimited |
-
-Asking for a window outside these caps returns an empty frame; the client treats that as a transient failure and retries before giving up.
-
 ## Rate limiting & retry
 
-- A process-wide lock spaces every outbound `Ticker.history` call by **at least 200 ms**.
-- Failures (raised exceptions OR empty frames) trigger exponential backoff: 1 s → 2 s → 4 s → 8 s → 16 s with jitter, up to 5 attempts.
-- Successful responses are cached to parquet under `DATA_CACHE_DIR` keyed on `(symbol, interval, start, end)`, so repeated backtests are offline.
+iTick's free tier hard-caps callers at **5 requests / minute / token**. The client therefore:
+
+- Routes every request through a **process-wide lock** that enforces ≥ 12.5 s between outbound calls. Concurrent backtests share the same budget.
+- Retries on raised exceptions, HTTP 429, and HTTP 5xx with exponential backoff: **15 s → 30 s → 60 s → 120 s → 240 s** (capped at 5 min), plus jitter, up to 5 attempts.
+- Walks long history backwards via the `et` query param, requesting up to 1000 bars per call. A month of 5-minute bars on one symbol is roughly 5 calls (~1 minute of real time including the throttle).
+- Caches every successful page to parquet under `DATA_CACHE_DIR` keyed on `(symbol, interval, start, end)`. Re-running a backtest is offline.
+
+A practical consequence: backtesting six symbols across many months can take **tens of minutes on the free tier**. Plan accordingly, or upgrade your iTick plan and lower `MIN_INTERVAL_SECONDS` in `data/itick_client.py`.
 
 ## Safety
 
@@ -84,8 +89,8 @@ Asking for a window outside these caps returns an empty frame; the client treats
 ```
 src/trading_bot/
 ├── config.py                 # Settings (env-driven)
-├── symbols.py                # Internal <-> yfinance / Ostium mapping
-├── data/                     # yfinance client + parquet cache + rate limit / retry
+├── symbols.py                # Internal <-> iTick / Ostium mapping
+├── data/                     # iTick client + parquet cache + rate limit / retry / paging
 ├── strategy/                 # Strategy ABC + four implementations
 ├── backtest/                 # Bar engine + metrics
 ├── execution/                # Paper + Ostium adapters
