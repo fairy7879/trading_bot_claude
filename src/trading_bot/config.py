@@ -10,8 +10,6 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore", case_sensitive=False
     )
 
-    twelvedata_api_key: str = Field(default="", description="Twelve Data API key.")
-
     ostium_private_key: str = Field(default="", description="EVM private key for Ostium.")
     ostium_rpc_url: str = Field(default="", description="Arbitrum RPC URL.")
     ostium_network: Literal["sepolia", "arbitrum"] = Field(default="sepolia")

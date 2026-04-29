@@ -3,8 +3,8 @@
 Example::
 
     python -m trading_bot.runner.backtest_cli \\
-        --symbol US500 --interval 5min \\
-        --start 2025-01-02 --end 2025-04-25 \\
+        --symbol US500 --interval 5m \\
+        --start 2025-04-01 --end 2025-04-25 \\
         --strategy intraday_momentum_bands
 """
 
@@ -21,7 +21,7 @@ from ..strategy import get_strategy
 def _parse() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--symbol", required=True)
-    p.add_argument("--interval", default="5min")
+    p.add_argument("--interval", default="5m")
     p.add_argument("--start", required=True, help="YYYY-MM-DD")
     p.add_argument("--end", required=True, help="YYYY-MM-DD")
     p.add_argument("--strategy", required=True)

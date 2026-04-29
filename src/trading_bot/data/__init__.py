@@ -1,3 +1,3 @@
-from .twelvedata_client import TwelveDataClient, fetch_ohlcv
+from .yfinance_client import YFinanceClient, fetch_ohlcv
 
-__all__ = ["TwelveDataClient", "fetch_ohlcv"]
+__all__ = ["YFinanceClient", "fetch_ohlcv"]

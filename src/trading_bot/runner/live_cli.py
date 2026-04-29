@@ -6,7 +6,7 @@ bars we replay before stopping; in production you'd loop on a schedule.
 Example::
 
     python -m trading_bot.runner.live_cli \\
-        --symbol US500 --interval 5min \\
+        --symbol US500 --interval 5m \\
         --strategy intraday_momentum_bands --bars 50
 """
 
@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 def _parse() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--symbol", required=True)
-    p.add_argument("--interval", default="5min")
+    p.add_argument("--interval", default="5m")
     p.add_argument("--strategy", required=True)
     p.add_argument("--bars", type=int, default=20, help="Number of recent bars to replay.")
     p.add_argument("--collateral-usd", type=float, default=10.0)
@@ -39,10 +39,13 @@ def _parse() -> argparse.Namespace:
 
 
 def _recent_window(bars: int, interval: str) -> tuple[str, str]:
-    minutes = {"1min": 1, "5min": 5, "15min": 15, "30min": 30, "1h": 60}.get(interval, 5)
+    minutes = {
+        "1m": 1, "2m": 2, "5m": 5, "15m": 15, "30m": 30,
+        "60m": 60, "90m": 90, "1h": 60,
+    }.get(interval, 5)
     end = datetime.now(timezone.utc)
     start = end - timedelta(minutes=minutes * (bars + 5))
-    return start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S")
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
 
 def main() -> None:
