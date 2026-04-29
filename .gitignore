@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# venv
+venv/
+.venv/
+env/
+
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+
+# Data cache
+.cache/
+*.parquet
+data_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs and run artifacts
+*.log
+runs/

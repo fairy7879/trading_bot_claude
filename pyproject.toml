@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading_bot"
+version = "0.1.0"
+description = "Intraday strategy framework for US500 / US100 / Gold / Forex. Backtests on Twelve Data, executes on Ostium."
+requires-python = ">=3.11"
+dependencies = [
+    "twelvedata[pandas]>=1.2.20",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "pyarrow>=15",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "python-dotenv>=1.0",
+    "ostium-python-sdk>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "requests-mock>=1.11",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
